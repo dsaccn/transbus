@@ -1,11 +1,16 @@
 import { User, Vehicle, Route, Trip, Ticket, Seat } from '../types';
 
+// Default password for all demo users: Transit@2025!
+// SHA-256 hash: 69fecb2d5cf8594a6dde0d662966f8ed5499f66430713432e964d0500a206862
+const DEFAULT_HASH = '69fecb2d5cf8594a6dde0d662966f8ed5499f66430713432e964d0500a206862';
+
 export const INITIAL_USERS: User[] = [
   {
     id: 'usr-admin-1',
     name: 'Yohannes Girma',
     nameAm: 'ዮሐንስ ግርማ',
     username: 'admin',
+    passwordHash: DEFAULT_HASH,
     role: 'admin',
     agentCode: 'ADM-001',
     stationId: 'stn-addis-main',
@@ -18,6 +23,7 @@ export const INITIAL_USERS: User[] = [
     name: 'Tigist Alemayehu',
     nameAm: 'ትዕግስት አለማየሁ',
     username: 'manager',
+    passwordHash: DEFAULT_HASH,
     role: 'manager',
     agentCode: 'MGR-012',
     stationId: 'stn-addis-main',
@@ -30,6 +36,7 @@ export const INITIAL_USERS: User[] = [
     name: 'Bekele Desta',
     nameAm: 'በቀለ ደስታ',
     username: 'agent1',
+    passwordHash: DEFAULT_HASH,
     role: 'agent',
     agentCode: 'AGT-104',
     stationId: 'stn-addis-main',
@@ -42,6 +49,7 @@ export const INITIAL_USERS: User[] = [
     name: 'Selamawit Kebede',
     nameAm: 'ሰላማዊት ከበደ',
     username: 'agent2',
+    passwordHash: DEFAULT_HASH,
     role: 'agent',
     agentCode: 'AGT-105',
     stationId: 'stn-addis-main',

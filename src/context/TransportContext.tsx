@@ -20,6 +20,25 @@ import {
 } from '../data/initialData';
 import { translations } from '../i18n/translations';
 import QRCode from 'qrcode';
+import {
+  verifyPassword,
+  createSession,
+  clearSession,
+  validateSession,
+  isAccountLocked,
+  recordFailedAttempt,
+  clearFailedAttempts,
+  getAccountLockoutUntil,
+  logSecurityEvent,
+} from '../security/auth';
+
+export interface LoginResult {
+  success: boolean;
+  error?: string;
+  locked?: boolean;
+  lockoutUntil?: number;
+  remainingAttempts?: number;
+}
 
 interface TransportContextType {
   language: Language;
@@ -28,7 +47,7 @@ interface TransportContextType {
   currentUser: User;
   setCurrentUser: (user: User) => void;
   isAuthenticated: boolean;
-  login: (user: User) => void;
+  login: (user: User, password: string) => Promise<LoginResult>;
   logout: () => void;
   users: User[];
   addUser: (user: Omit<User, 'id'>) => void;
@@ -109,9 +128,14 @@ export const TransportProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return saved ? JSON.parse(saved) : INITIAL_USERS;
   });
 
-  // Auth State
+  // Auth State — use sessionStorage so session dies when tab closes
   const [currentUser, setCurrentUser] = useState<User>(() => {
-    const savedAuth = localStorage.getItem('transit_station_current_user');
+    // Validate active session first
+    if (!validateSession()) {
+      clearSession();
+      return users.find((u) => u.role === 'agent') || users[2] || INITIAL_USERS[2];
+    }
+    const savedAuth = sessionStorage.getItem('ts_current_user');
     if (savedAuth) {
       try {
         return JSON.parse(savedAuth);
@@ -123,8 +147,7 @@ export const TransportProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const savedAuth = localStorage.getItem('transit_station_auth');
-    return savedAuth === 'true';
+    return validateSession();
   });
 
   // 3. Vehicles
@@ -197,8 +220,11 @@ export const TransportProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [tickets]);
 
   useEffect(() => {
-    localStorage.setItem('transit_station_auth', isAuthenticated ? 'true' : 'false');
-    localStorage.setItem('transit_station_current_user', JSON.stringify(currentUser));
+    if (isAuthenticated) {
+      sessionStorage.setItem('ts_current_user', JSON.stringify(currentUser));
+    } else {
+      sessionStorage.removeItem('ts_current_user');
+    }
   }, [isAuthenticated, currentUser]);
 
   // Live clock
@@ -218,9 +244,36 @@ export const TransportProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => clearInterval(interval);
   }, []);
 
-  const login = (user: User) => {
+  const login = async (user: User, password: string): Promise<LoginResult> => {
+    // Check if account is inactive
+    if (!user.active) {
+      logSecurityEvent('BLOCKED_INACTIVE', user.username, 'Login attempt on inactive account');
+      return { success: false, error: 'This account is disabled. Contact your administrator.' };
+    }
+
+    // Verify password hash
+    const storedHash = user.passwordHash;
+    if (!storedHash) {
+      // Legacy user without hash — reject
+      return { success: false, error: 'Account not configured. Contact administrator.' };
+    }
+
+    const passwordValid = await verifyPassword(password, storedHash);
+    if (!passwordValid) {
+      logSecurityEvent('FAILED_LOGIN', user.username, 'Incorrect password attempt');
+      return {
+        success: false,
+        error: language === 'am' ? 'የይለፍ ቃሉ ትክክል አይደለም።' : 'Incorrect password.',
+      };
+    }
+
+    // Successful login
+    clearFailedAttempts(user.username);
+    createSession(user.id, user.role);
     setCurrentUser(user);
     setIsAuthenticated(true);
+    logSecurityEvent('LOGIN_SUCCESS', user.username, `Logged in as ${user.role}`);
+
     // Route by role automatically
     if (user.role === 'agent') {
       setActiveTab('ticketCounter');
@@ -229,11 +282,14 @@ export const TransportProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } else if (user.role === 'admin') {
       setActiveTab('adminSettings');
     }
+
+    return { success: true };
   };
 
   const logout = () => {
     setIsAuthenticated(false);
-    localStorage.setItem('transit_station_auth', 'false');
+    clearSession();
+    logSecurityEvent('LOGOUT', currentUser.username, 'User logged out');
   };
 
   // User Management

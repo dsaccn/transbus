@@ -7,6 +7,7 @@ export interface User {
   name: string;
   nameAm: string;
   username: string;
+  passwordHash?: string; // SHA-256 hash of user password
   role: Role;
   agentCode: string; // e.g. "AGT-104"
   stationId: string;

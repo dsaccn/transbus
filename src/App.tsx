@@ -16,7 +16,8 @@ import { RouteManagement } from './components/RouteManagement/RouteManagement';
 import { BusRouteControl } from './components/BusRouteControl/BusRouteControl';
 import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { TicketModal } from './components/TicketModal';
-import { Cpu } from 'lucide-react';
+import { Cpu, Timer, LogOut, ShieldAlert } from 'lucide-react';
+import { useInactivityLogout } from './security/useInactivityLogout';
 
 const AppContent: React.FC = () => {
   const {
@@ -27,9 +28,16 @@ const AppContent: React.FC = () => {
     ticketsForPrint,
     setTicketsForPrint,
     language,
+    logout,
   } = useTransport();
 
-  // Permission Guard: if the current user tries to view an unauthorized tab, redirect to permitted home
+  // Inactivity auto-logout (1 hour)
+  const { showWarning, secondsRemaining } = useInactivityLogout({
+    isAuthenticated,
+    onLogout: logout,
+  });
+
+  // Permission Guard: redirect to permitted tab if unauthorized
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -55,18 +63,51 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated, currentUser?.role, activeTab, setActiveTab]);
 
-  // If user is not authenticated, render the dedicated multi-role Login Portal
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 selection:bg-emerald-500 selection:text-white">
+      {/* Inactivity Warning Banner */}
+      {showWarning && (
+        <div className="fixed top-0 left-0 right-0 z-[999] bg-amber-600 border-b border-amber-500 px-4 py-3 flex items-center justify-between shadow-lg animate-pulse">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="w-5 h-5 text-amber-100 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-amber-50">
+                {language === 'am' ? 'የሴሽን ማስጠንቀቂያ — ንቁ ካልሆኑ ይወጣሉ' : 'Session Expiring — Inactivity Detected'}
+              </p>
+              <p className="text-[11px] text-amber-200">
+                {language === 'am'
+                  ? `ምንም እርምጃ ካልወሰዱ ይህ ሴሽን ይዘጋል`
+                  : `You will be automatically logged out due to inactivity`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-amber-700/50 px-3 py-1.5 rounded-lg">
+              <Timer className="w-4 h-4 text-amber-200" />
+              <span className="font-mono-code font-bold text-amber-100 text-sm">
+                {secondsRemaining}s
+              </span>
+            </div>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-amber-100 rounded-lg text-xs font-bold transition cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Logout Now</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navigation Bar */}
       <Navbar />
 
       {/* Main Content Area */}
-      <main className="flex-1 pb-16">
+      <main className={`flex-1 pb-16 ${showWarning ? 'pt-14' : ''}`}>
         {activeTab === 'ticketCounter' && <TicketCounter />}
         {activeTab === 'dispatchManifest' && currentUser.role !== 'agent' && <ManagerDispatch />}
         {activeTab === 'verifyTicket' && <TicketVerifier />}
