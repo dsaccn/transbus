@@ -1,0 +1,6 @@
+{
+  "name": "Noxora Tech Solutions - Intercity Transport & Ticketing System",
+  "description": "Passenger vehicle station and digital seat ticketing system by Noxora Tech Solutions with multi-role access (Agent, Manager, Admin), QR pass verification, bilingual Amharic & English support, and fleet dispatch.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
